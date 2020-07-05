@@ -1,0 +1,68 @@
+version: '3.7'
+
+services:
+
+  ssl-proxy:
+    image: jwilder/nginx-proxy
+    container_name: ssl-proxy
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - certs:/etc/nginx/certs:ro
+      - vhostd:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+    labels:
+      - com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy
+
+  ssl-companion:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    restart: unless-stopped
+    container_name: ssl-companion
+    environment:
+      - NGINX_PROXY_CONTAINER=ssl-proxy
+    volumes:
+      - certs:/etc/nginx/certs:rw
+      - vhostd:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  wordpress-ong:
+    image: wordpress:php7.2
+    restart: unless-stopped
+    container_name: wordpress-ong
+    depends_on:
+      - mysql-cms
+    expose:
+      - 80
+    environment:
+      - WORDPRESS_DB_HOST=mysql
+      - WORDPRESS_DB_USER=${DATABASE_USER}
+      - WORDPRESS_DB_PASSWORD=${DATABASE_PASSWORD}
+      - WORDPRESS_DB_NAME=${DATABASE_NAME}
+      - VIRTUAL_HOST="domain.name.org"
+      - LETSENCRYPT_HOST="domain.name.org"
+      - LETSENCRYPT_EMAIL="contact@mail.com"
+    volumes:
+      - wordpress-ong:/var/www/html:rw
+
+  mysql-cms:
+    image: mysql:5.7
+    restart: unless-stopped
+    container_name: mysql-cms
+    environment:
+      - MYSQL_DATABASE=${DATABASE_NAME}
+      - MYSQL_USER=${DATABASE_USER}
+      - MYSQL_PASSWORD=${DATABASE_PASSWORD}
+      - MYSQL_RANDOM_ROOT_PASSWORD="1"
+    volumes:
+      - db-cms:/var/lib/mysql:rw
+
+volumes: 
+  certs:
+  html:
+  vhostd:
+  wordpress-ong:
+  db-cms:
